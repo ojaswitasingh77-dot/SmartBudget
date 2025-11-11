@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SmartSpend — Budget Tracker</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase SDK (v9 compat - modular) -->
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">💸</div>
+        <div class="title">SmartSpend</div>
+      </div>
+
+      <nav>
+        <button class="nav-item active" data-section="dashboard">🏠 Dashboard</button>
+        <button class="nav-item" data-section="transactions">📑 Transactions</button>
+        <button class="nav-item" data-section="budgets">📊 Budgets</button>
+        <button class="nav-item" data-section="insights">📈 Insights</button>
+        <button class="nav-item" data-section="goals">🎯 Goals</button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div id="userBox" class="userbox">
+          <div id="userEmail" class="user-email">Not signed in</div>
+          <button id="signinBtn" class="secondary">Sign in</button>
+        </div>
+        <small class="hint">Built by you — for students</small>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="search-wrap">
+          <input id="searchInput" placeholder="Search category or notes..." />
+        </div>
+        <div class="top-actions">
+          <button id="quickAdd" class="primary">+ Add</button>
+          <button id="publishState" class="ghost">Offline mode</button>
+        </div>
+      </header>
+
+      <!-- Sections -->
+      <section id="dashboard" class="section visible">
+        <div class="grid">
+          <div class="card balance-card">
+            <h3>Current Balance</h3>
+            <div class="big" id="balance">₹0</div>
+            <div class="small" id="savedSummary">Saved this month: ₹0</div>
+          </div>
+
+          <div class="card budget-card">
+            <h3>Monthly Budget</h3>
+            <div class="small" id="budgetText">Set your budget</div>
+            <div class="progress">
+              <div id="budgetProgress" class="progress-bar" style="width:0%"></div>
+            </div>
+            <div class="small" id="budgetAlert"></div>
+          </div>
+
+          <div class="card mini" id="miniStats">
+            <div>Avg daily: <strong id="avgDaily">₹0</strong></div>
+            <div>Top category: <strong id="topCategory">—</strong></div>
+            <div>Days logged: <strong id="daysLogged">0</strong></div>
+          </div>
+        </div>
+
+        <div class="card transactions-preview">
+          <div class="card-header">
+            <h4>Recent Transactions</h4>
+            <button id="viewAllTx" class="link">View all</button>
+          </div>
+          <ul id="recentList" class="tx-list"></ul>
+        </div>
+      </section>
+
+      <section id="transactions" class="section">
+        <div class="card">
+          <h3>Add Transaction</h3>
+          <form id="txForm" class="tx-form">
+            <input id="txAmount" type="number" placeholder="Amount (₹)" required />
+            <select id="txType">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+            <select id="txCategory">
+              <option>Food</option>
+              <option>Transport</option>
+              <option>Studies</option>
+              <option>Rent</option>
+              <option>Entertainment</option>
+              <option>Savings</option>
+              <option>Misc</option>
+            </select>
+            <select id="txPayment">
+              <option>Cash</option>
+              <option>UPI</option>
+              <option>Card</option>
+            </select>
+            <input id="txDate" type="date" />
+            <input id="txNote" placeholder="Note (optional)" />
+            <div class="form-row">
+              <button type="submit" class="primary">Add ✅</button>
+              <button id="importSample" type="button" class="secondary">Add sample data</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>All Transactions</h3>
+          <div class="filters">
+            <select id="filterCategory"><option value="">All categories</option></select>
+            <select id="filterType"><option value="">All</option><option value="expense">Expense</option><option value="income">Income</option></select>
+            <input id="filterFrom" type="month" />
+            <button id="clearFilters" class="ghost">Clear</button>
+          </div>
+          <ul id="txList" class="tx-list"></ul>
+        </div>
+      </section>
+
+      <section id="budgets" class="section">
+        <div class="card">
+          <h3>Manage Budgets</h3>
+          <label>Monthly Budget (₹)</label>
+          <input id="monthlyBudgetInput" type="number" placeholder="e.g., 5000" />
+          <button id="saveBudget" class="primary">Save Budget</button>
+          <div class="small muted">You can also set category budgets below.</div>
+
+          <div id="categoryBudgets" class="category-budgets"></div>
+        </div>
+      </section>
+
+      <section id="insights" class="section">
+        <div class="card">
+          <h3>Spending by Category</h3>
+          <canvas id="catChart" height="160"></canvas>
+        </div>
+        <div class="card">
+          <h3>Weekly Spending</h3>
+          <canvas id="weekChart" height="120"></canvas>
+        </div>
+        <div class="card">
+          <h3>Monthly Trend</h3>
+          <canvas id="trendChart" height="120"></canvas>
+        </div>
+      </section>
+
+      <section id="goals" class="section">
+        <div class="card">
+          <h3>Savings Goals</h3>
+          <form id="goalForm">
+            <input id="goalTitle" placeholder="Goal name (e.g., New laptop)" />
+            <input id="goalAmount" type="number" placeholder="Amount (₹)" />
+            <button class="primary" type="submit">Add Goal</button>
+          </form>
+          <ul id="goalsList" class="goal-list"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Sign-in Modal -->
+  <div id="authModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Sign in to SmartSpend</h3>
+      <div id="authMsg" class="muted">Use Email or Google</div>
+      <input id="emailInput" placeholder="Email" type="email" />
+      <input id="passInput" placeholder="Password" type="password" />
+      <div class="form-row">
+        <button id="emailSignup" class="primary">Sign up</button>
+        <button id="emailLogin" class="secondary">Sign in</button>
+      </div>
+      <div class="form-row">
+        <button id="googleSignIn" class="ghost">Sign in with Google</button>
+        <button id="closeAuth" class="ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
