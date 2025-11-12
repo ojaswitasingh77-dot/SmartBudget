@@ -1,199 +1,248 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SmartSpend — Budget Tracker</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartSpend — Student Budget Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background-color: #f4f6f9; /* Light background */
+      color: #222; /* Dark readable text */
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      background-color: #00b894; /* Mint green */
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 20px;
+    }
+    .sidebar h2 {
+      margin-bottom: 30px;
+    }
+    .sidebar button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      margin: 10px 0;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      padding: 10px 20px;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    .sidebar button:hover,
+    .sidebar button.active {
+      background: rgba(255, 255, 255, 0.2);
+    }
 
-  <!-- Firebase SDK (v9 compat - modular) -->
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    /* Main content */
+    .main {
+      flex: 1;
+      padding: 20px 40px;
+      overflow-y: auto;
+      background-color: white;
+      border-radius: 20px 0 0 20px;
+    }
 
-  <link rel="stylesheet" href="style.css" />
+    h1 {
+      color: #00b894;
+    }
+
+    /* Card style */
+    .card {
+      background: #f9f9f9;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      padding: 15px 20px;
+      margin-bottom: 20px;
+    }
+
+    /* Inputs and buttons */
+    input, select {
+      padding: 8px;
+      margin: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    button.action {
+      background-color: #00b894;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    button.action:hover {
+      background-color: #019870;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <div class="app">
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo">💸</div>
-        <div class="title">SmartSpend</div>
-      </div>
-
-      <nav>
-        <button class="nav-item active" data-section="dashboard">🏠 Dashboard</button>
-        <button class="nav-item" data-section="transactions">📑 Transactions</button>
-        <button class="nav-item" data-section="budgets">📊 Budgets</button>
-        <button class="nav-item" data-section="insights">📈 Insights</button>
-        <button class="nav-item" data-section="goals">🎯 Goals</button>
-      </nav>
-
-      <div class="sidebar-bottom">
-        <div id="userBox" class="userbox">
-          <div id="userEmail" class="user-email">Not signed in</div>
-          <button id="signinBtn" class="secondary">Sign in</button>
-        </div>
-        <small class="hint">Built by you — for students</small>
-      </div>
-    </aside>
-
-    <!-- MAIN -->
-    <main class="main">
-      <!-- Top bar -->
-      <header class="topbar">
-        <div class="search-wrap">
-          <input id="searchInput" placeholder="Search category or notes..." />
-        </div>
-        <div class="top-actions">
-          <button id="quickAdd" class="primary">+ Add</button>
-          <button id="publishState" class="ghost">Offline mode</button>
-        </div>
-      </header>
-
-      <!-- Sections -->
-      <section id="dashboard" class="section visible">
-        <div class="grid">
-          <div class="card balance-card">
-            <h3>Current Balance</h3>
-            <div class="big" id="balance">₹0</div>
-            <div class="small" id="savedSummary">Saved this month: ₹0</div>
-          </div>
-
-          <div class="card budget-card">
-            <h3>Monthly Budget</h3>
-            <div class="small" id="budgetText">Set your budget</div>
-            <div class="progress">
-              <div id="budgetProgress" class="progress-bar" style="width:0%"></div>
-            </div>
-            <div class="small" id="budgetAlert"></div>
-          </div>
-
-          <div class="card mini" id="miniStats">
-            <div>Avg daily: <strong id="avgDaily">₹0</strong></div>
-            <div>Top category: <strong id="topCategory">—</strong></div>
-            <div>Days logged: <strong id="daysLogged">0</strong></div>
-          </div>
-        </div>
-
-        <div class="card transactions-preview">
-          <div class="card-header">
-            <h4>Recent Transactions</h4>
-            <button id="viewAllTx" class="link">View all</button>
-          </div>
-          <ul id="recentList" class="tx-list"></ul>
-        </div>
-      </section>
-
-      <section id="transactions" class="section">
-        <div class="card">
-          <h3>Add Transaction</h3>
-          <form id="txForm" class="tx-form">
-            <input id="txAmount" type="number" placeholder="Amount (₹)" required />
-            <select id="txType">
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-            </select>
-            <select id="txCategory">
-              <option>Food</option>
-              <option>Transport</option>
-              <option>Studies</option>
-              <option>Rent</option>
-              <option>Entertainment</option>
-              <option>Savings</option>
-              <option>Misc</option>
-            </select>
-            <select id="txPayment">
-              <option>Cash</option>
-              <option>UPI</option>
-              <option>Card</option>
-            </select>
-            <input id="txDate" type="date" />
-            <input id="txNote" placeholder="Note (optional)" />
-            <div class="form-row">
-              <button type="submit" class="primary">Add ✅</button>
-              <button id="importSample" type="button" class="secondary">Add sample data</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card">
-          <h3>All Transactions</h3>
-          <div class="filters">
-            <select id="filterCategory"><option value="">All categories</option></select>
-            <select id="filterType"><option value="">All</option><option value="expense">Expense</option><option value="income">Income</option></select>
-            <input id="filterFrom" type="month" />
-            <button id="clearFilters" class="ghost">Clear</button>
-          </div>
-          <ul id="txList" class="tx-list"></ul>
-        </div>
-      </section>
-
-      <section id="budgets" class="section">
-        <div class="card">
-          <h3>Manage Budgets</h3>
-          <label>Monthly Budget (₹)</label>
-          <input id="monthlyBudgetInput" type="number" placeholder="e.g., 5000" />
-          <button id="saveBudget" class="primary">Save Budget</button>
-          <div class="small muted">You can also set category budgets below.</div>
-
-          <div id="categoryBudgets" class="category-budgets"></div>
-        </div>
-      </section>
-
-      <section id="insights" class="section">
-        <div class="card">
-          <h3>Spending by Category</h3>
-          <canvas id="catChart" height="160"></canvas>
-        </div>
-        <div class="card">
-          <h3>Weekly Spending</h3>
-          <canvas id="weekChart" height="120"></canvas>
-        </div>
-        <div class="card">
-          <h3>Monthly Trend</h3>
-          <canvas id="trendChart" height="120"></canvas>
-        </div>
-      </section>
-
-      <section id="goals" class="section">
-        <div class="card">
-          <h3>Savings Goals</h3>
-          <form id="goalForm">
-            <input id="goalTitle" placeholder="Goal name (e.g., New laptop)" />
-            <input id="goalAmount" type="number" placeholder="Amount (₹)" />
-            <button class="primary" type="submit">Add Goal</button>
-          </form>
-          <ul id="goalsList" class="goal-list"></ul>
-        </div>
-      </section>
-    </main>
+  <div class="sidebar">
+    <h2>💸 SmartSpend</h2>
+    <button class="active" onclick="showSection('dashboard')">Dashboard</button>
+    <button onclick="showSection('transactions')">Transactions</button>
+    <button onclick="showSection('budgets')">Budgets</button>
+    <button onclick="showSection('insights')">Insights</button>
+    <button onclick="showSection('goals')">Goals</button>
   </div>
 
-  <!-- Sign-in Modal -->
-  <div id="authModal" class="modal hidden">
-    <div class="modal-card">
-      <h3>Sign in to SmartSpend</h3>
-      <div id="authMsg" class="muted">Use Email or Google</div>
-      <input id="emailInput" placeholder="Email" type="email" />
-      <input id="passInput" placeholder="Password" type="password" />
-      <div class="form-row">
-        <button id="emailSignup" class="primary">Sign up</button>
-        <button id="emailLogin" class="secondary">Sign in</button>
+  <div class="main">
+    <!-- Dashboard -->
+    <div id="dashboard" class="section">
+      <h1>Dashboard</h1>
+      <div class="card">
+        <h3>Current Balance</h3>
+        <p>₹0 — Saved this month: ₹0</p>
       </div>
-      <div class="form-row">
-        <button id="googleSignIn" class="ghost">Sign in with Google</button>
-        <button id="closeAuth" class="ghost">Close</button>
+      <div class="card">
+        <h3>Monthly Budget</h3>
+        <p>Set your budget to start tracking.</p>
+      </div>
+    </div>
+
+    <!-- Transactions -->
+    <div id="transactions" class="section hidden">
+      <h1>Transactions</h1>
+      <div class="card">
+        <label>Amount (₹)</label>
+        <input type="number" id="amount" placeholder="Enter amount" />
+        <select id="type">
+          <option>Expense</option>
+          <option>Income</option>
+        </select>
+        <select id="category">
+          <option>Food</option>
+          <option>Transport</option>
+          <option>Studies</option>
+          <option>Rent</option>
+          <option>Entertainment</option>
+          <option>Misc</option>
+        </select>
+        <select id="method">
+          <option>Cash</option>
+          <option>UPI</option>
+          <option>Card</option>
+        </select>
+        <input type="date" id="date" />
+        <button class="action" onclick="addTransaction()">Add</button>
+      </div>
+      <div class="card">
+        <h3>All Transactions</h3>
+        <ul id="transactionList"></ul>
+      </div>
+    </div>
+
+    <!-- Budgets -->
+    <div id="budgets" class="section hidden">
+      <h1>Budgets</h1>
+      <div class="card">
+        <label>Set Monthly Budget (₹)</label>
+        <input type="number" id="budgetInput" placeholder="Enter your budget" />
+        <button class="action" onclick="setBudget()">Save</button>
+      </div>
+      <div class="card">
+        <p id="budgetText">No budget set yet.</p>
+      </div>
+    </div>
+
+    <!-- Insights -->
+    <div id="insights" class="section hidden">
+      <h1>Insights</h1>
+      <p>Charts & analytics will appear here soon 📊</p>
+    </div>
+
+    <!-- Goals -->
+    <div id="goals" class="section hidden">
+      <h1>Goals</h1>
+      <div class="card">
+        <label>Goal Name</label>
+        <input type="text" id="goalName" placeholder="e.g. Buy phone" />
+        <label>Target Amount (₹)</label>
+        <input type="number" id="goalTarget" placeholder="10000" />
+        <button class="action" onclick="addGoal()">Add Goal</button>
+      </div>
+      <div class="card">
+        <ul id="goalList"></ul>
       </div>
     </div>
   </div>
 
-  <!-- Toast -->
-  <div id="toast" class="toast hidden"></div>
+  <script>
+    function showSection(id) {
+      document.querySelectorAll(".section").forEach(sec => sec.classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+      document.querySelectorAll(".sidebar button").forEach(btn => btn.classList.remove("active"));
+      event.target.classList.add("active");
+    }
 
-  <script type="module" src="script.js"></script>
+    let transactions = [];
+    let budget = 0;
+    let goals = [];
+
+    function addTransaction() {
+      const amount = document.getElementById("amount").value;
+      const type = document.getElementById("type").value;
+      const category = document.getElementById("category").value;
+      const method = document.getElementById("method").value;
+      const date = document.getElementById("date").value;
+
+      if (!amount || !date) return alert("Please fill all fields");
+
+      const entry = { amount, type, category, method, date };
+      transactions.push(entry);
+      renderTransactions();
+    }
+
+    function renderTransactions() {
+      const list = document.getElementById("transactionList");
+      list.innerHTML = "";
+      transactions.forEach((t, i) => {
+        const li = document.createElement("li");
+        li.textContent = `${t.type}: ₹${t.amount} on ${t.category} (${t.method}) — ${t.date}`;
+        list.appendChild(li);
+      });
+    }
+
+    function setBudget() {
+      budget = document.getElementById("budgetInput").value;
+      document.getElementById("budgetText").textContent = `Monthly budget set to ₹${budget}`;
+    }
+
+    function addGoal() {
+      const name = document.getElementById("goalName").value;
+      const target = document.getElementById("goalTarget").value;
+      if (!name || !target) return alert("Please enter both fields");
+      goals.push({ name, target });
+      renderGoals();
+    }
+
+    function renderGoals() {
+      const list = document.getElementById("goalList");
+      list.innerHTML = "";
+      goals.forEach(g => {
+        const li = document.createElement("li");
+        li.textContent = `${g.name} — Target ₹${g.target}`;
+        list.appendChild(li);
+      });
+    }
+  </script>
 </body>
 </html>
